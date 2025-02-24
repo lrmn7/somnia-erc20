@@ -1,49 +1,79 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.26;
 
-contract LRMN {
-    event RMNBought(
-        address indexed supporter,
-        uint256 amount,
-        string message,
-        uint256 timestamp
-    );
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 
-    address public owner;
-
-    struct Contribution {
-        address supporter;
-        uint256 amount;
-        string message;
+contract LRMN is Ownable, Pausable {
+    struct LRMNMessage {
+        uint256 index;
         uint256 timestamp;
-    }
-    
-    Contribution[] public contributions;
-
-    constructor() {
-        owner = msg.sender;
+        address sender;
+        string message;
     }
 
-    function buyRMN(string memory message) external payable {
-        require(msg.value > 0, "Amount must be greater than zero.");
-        contributions.push(
-            Contribution(msg.sender, msg.value, message, block.timestamp)
+    uint256 public constant MAX_MESSAGES = 10;
+
+    uint256 public lrmnFee;
+    uint256 public totalMessages;
+    mapping(address => uint256) public messageCount;
+    mapping(uint256 => LRMNMessage) public messages;
+
+    event LRMNEvent(
+        address indexed sender,
+        string message,
+        uint256 senderMessageCount,
+        uint256 totalMessages
+    );
+    event FeeUpdated(uint256 newFee);
+    event LRMNPaused(bool isPaused);
+
+    constructor(uint256 _fee) Ownable(msg.sender) {
+        lrmnFee = _fee;
+    }
+
+    function sendMessage(string calldata message) external payable whenNotPaused {
+        require(msg.value >= lrmnFee, "Insufficient fee");
+
+        messages[totalMessages] = LRMNMessage(
+            totalMessages,
+            block.timestamp,
+            msg.sender,
+            message
         );
+        totalMessages++;
+        messageCount[msg.sender]++;
 
-        emit RMNBought(msg.sender, msg.value, message, block.timestamp);
+        emit LRMNEvent(msg.sender, message, messageCount[msg.sender], totalMessages);
     }
 
-    function withdraw() external {
-        require(msg.sender == owner, "Only the owner can withdraw funds.");
-        payable(owner).transfer(address(this).balance);
+    function getLastMessages() external view returns (LRMNMessage[] memory) {
+        uint256 count = totalMessages < MAX_MESSAGES ? totalMessages : MAX_MESSAGES;
+        LRMNMessage[] memory lastMessages = new LRMNMessage[](count);
+
+        for (uint256 i = 0; i < count; i++) {
+            lastMessages[i] = messages[totalMessages - 1 - i];
+        }
+
+        return lastMessages;
     }
 
-    function getContributions() external view returns (Contribution[] memory) {
-        return contributions;
+    function updateFee(uint256 newFee) external onlyOwner {
+        lrmnFee = newFee;
+        emit FeeUpdated(newFee);
     }
 
-    function setOwner(address newOwner) external {
-        require(msg.sender == owner, "Only the owner can set a new owner.");
-        owner = newOwner;
+    function pause() external onlyOwner whenNotPaused {
+        _pause();
+        emit LRMNPaused(true);
+    }
+
+    function unpause() external onlyOwner whenPaused {
+        _unpause();
+        emit LRMNPaused(false);
+    }
+
+    function withdraw() external onlyOwner {
+        payable(owner()).transfer(address(this).balance);
     }
 }

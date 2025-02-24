@@ -1,19 +1,18 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
-import dotenv from "dotenv";
-
-dotenv.config();
 
 const config: HardhatUserConfig = {
-  solidity: "0.8.28", // replace if necessary
+  solidity: "0.8.26",
   networks: {
-    'somnia-devnet': {
-      url: 'https://somnia-poc.w3us.site/api/eth-rpc'
+    "somnia-devnet": {
+      url: "https://somnia-poc.w3us.site/api/eth-rpc",
+      chainId: 50311,
+      accounts: ["private key"]
     },
   },
   etherscan: {
     apiKey: {
-      'somnia-devnet': 'empty'
+      "somnia-devnet": "empty",
     },
     customChains: [
       {
